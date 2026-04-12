@@ -2,6 +2,8 @@
 const cors = require("cors");
 const path = require("path");
 const session = require("express-session");
+const passport = require("passport");
+const GitHubStrategy = require("passport-github2").Strategy;
 require("dotenv").config();
 
 const app = express();
@@ -28,6 +30,39 @@ app.use(
   }),
 );
 
+// ─── Passport Setup ───────────────────────────────────────────────────────────
+app.use(passport.initialize());
+app.use(passport.session());
+
+passport.serializeUser((user, done) => {
+  done(null, user);
+});
+
+passport.deserializeUser((user, done) => {
+  done(null, user);
+});
+
+passport.use(
+  new GitHubStrategy(
+    {
+      clientID: process.env.GITHUB_CLIENT_ID,
+      clientSecret: process.env.GITHUB_CLIENT_SECRET,
+      callbackURL: process.env.GITHUB_CALLBACK_URL,
+    },
+    function (accessToken, refreshToken, profile, done) {
+      const user = {
+        id: profile.id,
+        username: profile.username,
+        name: profile.displayName || profile.username,
+        avatar: profile.photos[0]?.value || "",
+        email: profile.emails?.[0]?.value || "",
+        accessToken: accessToken,
+      };
+      return done(null, user);
+    },
+  ),
+);
+
 // ─── Health Check ─────────────────────────────────────────────────────────────
 app.get("/api/health", (req, res) => {
   res.json({
@@ -39,52 +74,80 @@ app.get("/api/health", (req, res) => {
 
 // ─── Auth Routes ──────────────────────────────────────────────────────────────
 app.get("/api/auth/status", (req, res) => {
-  if (req.session && req.session.user) {
-    res.json({ loggedIn: true, user: req.session.user });
+  if (req.isAuthenticated()) {
+    res.json({ loggedIn: true, user: req.user });
   } else {
     res.json({ loggedIn: false, user: null });
   }
 });
 
-app.get("/auth/github", (req, res) => {
-  req.session.user = {
-    id: "test_123",
-    username: "TestDeveloper",
-    avatar: "https://avatars.githubusercontent.com/u/9919?v=4",
-    name: "Test Developer",
-  };
-  res.redirect(process.env.CLIENT_URL || "http://localhost:3000");
-});
+// Step 1 — redirect to GitHub
+app.get(
+  "/auth/github",
+  passport.authenticate("github", {
+    scope: ["user:email", "repo"],
+  }),
+);
 
+// Step 2 — GitHub redirects back here
+app.get(
+  "/auth/github/callback",
+  passport.authenticate("github", {
+    failureRedirect: process.env.CLIENT_URL + "?error=auth_failed",
+  }),
+  (req, res) => {
+    // Success — send user to dashboard
+    res.redirect(process.env.CLIENT_URL + "/dashboard");
+  },
+);
+
+// Logout
 app.get("/auth/logout", (req, res) => {
-  req.session.destroy();
-  res.redirect(process.env.CLIENT_URL || "http://localhost:3000");
+  req.logout(() => {
+    res.redirect(process.env.CLIENT_URL || "http://localhost:3000");
+  });
 });
 
 // ─── Repos Route ──────────────────────────────────────────────────────────────
-app.get("/api/repos", (req, res) => {
-  if (!req.session.user) {
+app.get("/api/repos", async (req, res) => {
+  if (!req.isAuthenticated()) {
     return res.status(401).json({ error: "Not logged in" });
   }
-  res.json([
-    {
-      id: 1,
-      name: "my-portfolio",
-      language: "JavaScript",
-      updated_at: "2024-01-10",
-    },
-    { id: 2, name: "todo-app", language: "React", updated_at: "2024-01-08" },
-    { id: 3, name: "flask-api", language: "Python", updated_at: "2024-01-05" },
-  ]);
+
+  try {
+    const response = await fetch(
+      "https://api.github.com/user/repos?sort=updated&per_page=20",
+      {
+        headers: {
+          Authorization: `Bearer ${req.user.accessToken}`,
+          Accept: "application/vnd.github.v3+json",
+        },
+      },
+    );
+    const repos = await response.json();
+    res.json(
+      repos.map((r) => ({
+        id: r.id,
+        name: r.name,
+        language: r.language || "Unknown",
+        updated_at: r.updated_at?.split("T")[0],
+        private: r.private,
+        url: r.html_url,
+      })),
+    );
+  } catch (err) {
+    console.error("GitHub API error:", err);
+    res.status(500).json({ error: "Failed to fetch repos" });
+  }
 });
 
 // ─── Deploy Route ─────────────────────────────────────────────────────────────
 app.post("/api/deploy", (req, res) => {
-  if (!req.session.user) {
+  if (!req.isAuthenticated()) {
     return res.status(401).json({ error: "Not logged in" });
   }
   const { repoName } = req.body;
-  console.log(`Deploy triggered for: ${repoName}`);
+  console.log(`Deploy triggered for: ${repoName} by ${req.user.username}`);
   res.json({
     success: true,
     message: `Deployment started for ${repoName}`,
@@ -105,7 +168,7 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log("");
   console.log("  ✅ SmartDeploy Backend running!");
-  console.log(`  👉 Server URL : http://localhost:${PORT}`);
+  console.log(`  👉 Server URL  : http://localhost:${PORT}`);
   console.log(`  👉 Health check: http://localhost:${PORT}/api/health`);
   console.log("");
 });

@@ -1,4 +1,3 @@
-/* ─── Reset & Base ──────────────────────────────────────────────────────── */
 *,
 *::before,
 *::after {
@@ -8,20 +7,16 @@
 }
 
 :root {
-  --black: #0a0a0a;
+  --black: #080808;
   --white: #ffffff;
-  --gray-100: #f5f5f5;
-  --gray-200: #e8e8e8;
+  --green: #00ff88;
+  --green-dim: #00ff8833;
+  --green-dark: #00cc6a;
   --gray-400: #9ca3af;
   --gray-600: #4b5563;
-  --gray-800: #1f2937;
-  --green: #00ff88;
-  --green-dark: #00cc6a;
-  --blue: #3b82f6;
-  --red: #ef4444;
-  --yellow: #f59e0b;
-  --card-bg: #111111;
-  --border: #222222;
+  --card-bg: #0f0f0f;
+  --border: #1a1a1a;
+  --border2: #2a2a2a;
 }
 
 body {
@@ -29,6 +24,7 @@ body {
   background: var(--black);
   color: var(--white);
   min-height: 100vh;
+  overflow-x: hidden;
 }
 
 a {
@@ -40,7 +36,7 @@ button {
   font-family: inherit;
 }
 
-/* ─── Loading Screen ────────────────────────────────────────────────────── */
+/* ── Loading ── */
 .loading-screen {
   display: flex;
   flex-direction: column;
@@ -50,23 +46,21 @@ button {
   gap: 16px;
   color: var(--gray-400);
 }
-
 .loading-spinner {
-  width: 40px;
-  height: 40px;
-  border: 3px solid var(--border);
+  width: 36px;
+  height: 36px;
+  border: 2px solid var(--border2);
   border-top-color: var(--green);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
-
 @keyframes spin {
   to {
     transform: rotate(360deg);
   }
 }
 
-/* ─── LOGIN PAGE ────────────────────────────────────────────────────────── */
+/* ── LOGIN PAGE ── */
 .login-page {
   min-height: 100vh;
   display: flex;
@@ -75,21 +69,43 @@ button {
   overflow: hidden;
 }
 
+.mouse-glow {
+  position: fixed;
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(
+    circle,
+    rgba(0, 255, 136, 0.06) 0%,
+    transparent 70%
+  );
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 0;
+  transition:
+    left 0.1s,
+    top 0.1s;
+}
+
 .bg-grid {
   position: fixed;
   inset: 0;
-  background-image: radial-gradient(circle, #2a2a2a 1px, transparent 1px);
-  background-size: 32px 32px;
+  background-image:
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 60px 60px;
   pointer-events: none;
   z-index: 0;
+  opacity: 0.4;
 }
 
 .login-header {
   position: relative;
-  z-index: 1;
+  z-index: 10;
   padding: 24px 48px;
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
 }
 
 .logo {
@@ -97,17 +113,23 @@ button {
   align-items: center;
   gap: 10px;
 }
-
 .logo-icon {
-  font-size: 22px;
+  font-size: 20px;
   color: var(--green);
 }
-
 .logo-text {
   font-family: "Space Mono", monospace;
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 700;
   letter-spacing: -0.5px;
+}
+.nav-tag {
+  font-family: "Space Mono", monospace;
+  font-size: 11px;
+  color: var(--gray-600);
+  border: 1px solid var(--border2);
+  padding: 4px 10px;
+  border-radius: 100px;
 }
 
 .login-main {
@@ -118,143 +140,179 @@ button {
   align-items: center;
   justify-content: center;
   gap: 80px;
-  padding: 40px 48px;
+  padding: 60px 80px;
 }
 
-.login-card {
-  max-width: 460px;
+/* Hero Left */
+.hero-left {
+  max-width: 520px;
   width: 100%;
 }
 
-.badge {
-  display: inline-block;
+.floating-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   font-family: "Space Mono", monospace;
   font-size: 11px;
   color: var(--green);
-  border: 1px solid var(--green);
-  padding: 5px 12px;
+  background: var(--green-dim);
+  border: 1px solid rgba(0, 255, 136, 0.2);
+  padding: 6px 14px;
   border-radius: 100px;
-  margin-bottom: 28px;
-  letter-spacing: 0.5px;
+  margin-bottom: 32px;
+}
+.badge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+  animation: pulse 2s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(0.8);
+  }
 }
 
-.login-title {
-  font-size: 52px;
+.hero-title {
+  font-size: 64px;
   font-weight: 800;
-  line-height: 1.1;
-  letter-spacing: -2px;
-  margin-bottom: 20px;
+  line-height: 1.05;
+  letter-spacing: -3px;
+  margin-bottom: 24px;
 }
-
-.login-title-accent {
+.hero-accent {
   color: var(--green);
 }
 
-.login-subtitle {
+.hero-desc {
   font-size: 16px;
   color: var(--gray-400);
-  line-height: 1.7;
+  line-height: 1.8;
   margin-bottom: 40px;
 }
 
 .github-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 28px;
+  background: var(--green);
+  color: var(--black);
+  font-family: "Syne", sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  border-radius: 10px;
+  transition: all 0.2s;
+  margin-bottom: 20px;
+}
+.github-btn:hover {
+  background: var(--white);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 40px rgba(0, 255, 136, 0.2);
+}
+.btn-arrow {
+  margin-left: 4px;
+  transition: transform 0.2s;
+}
+.github-btn:hover .btn-arrow {
+  transform: translateX(4px);
+}
+
+.hero-note {
+  font-size: 12px;
+  color: var(--gray-600);
+  font-family: "Space Mono", monospace;
+}
+
+/* Hero Right — Pipeline card */
+.hero-right {
+  flex-shrink: 0;
+}
+
+.pipeline-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border2);
+  border-radius: 20px;
+  padding: 28px;
+  width: 300px;
+}
+
+.pipeline-card-title {
+  font-family: "Space Mono", monospace;
+  font-size: 11px;
+  color: var(--gray-600);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin-bottom: 24px;
+}
+
+.pipeline-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.pipeline-row:last-child {
+  border-bottom: none;
+}
+
+.pipeline-icon-box {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--border);
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  width: 100%;
-  padding: 16px 24px;
-  background: var(--white);
-  color: var(--black);
-  font-family: "Syne", sans-serif;
   font-size: 16px;
-  font-weight: 700;
-  border-radius: 12px;
-  transition: all 0.2s;
-  margin-bottom: 40px;
-}
-
-.github-btn:hover {
-  background: var(--green);
-  transform: translateY(-2px);
-  box-shadow: 0 8px 32px rgba(0, 255, 136, 0.25);
-}
-
-.features {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.feature-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 14px;
-  color: var(--gray-400);
-}
-
-.feature-icon {
-  font-size: 18px;
-}
-
-/* Pipeline visual on login page */
-.pipeline-visual {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0;
-}
-
-.pipeline-step {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-}
-
-.step-dot {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  border: 2px solid var(--border);
-  background: var(--card-bg);
+  flex-shrink: 0;
   transition: all 0.3s;
 }
-
-.pipeline-step.active .step-dot {
-  background: var(--green);
-  border-color: var(--green);
-  box-shadow: 0 0 12px rgba(0, 255, 136, 0.5);
+.pipeline-icon-box.active {
+  background: var(--green-dim);
+  border: 1px solid rgba(0, 255, 136, 0.3);
 }
 
-.step-label {
-  font-family: "Space Mono", monospace;
-  font-size: 12px;
-  color: var(--gray-600);
+.pipeline-row-info {
+  flex: 1;
 }
-
-.pipeline-step.active .step-label {
-  color: var(--green);
-}
-
-.pipeline-line {
-  width: 2px;
-  height: 40px;
-  background: var(--border);
-}
-
-.login-footer {
-  position: relative;
-  z-index: 1;
-  padding: 24px 48px;
-  text-align: center;
+.pipeline-row-label {
   font-size: 13px;
-  color: var(--gray-600);
+  font-weight: 600;
+  color: var(--gray-400);
+}
+.pipeline-row-label.active {
+  color: var(--white);
+}
+.pipeline-row-sub {
   font-family: "Space Mono", monospace;
+  font-size: 10px;
+  color: var(--gray-600);
+  margin-top: 2px;
 }
 
-/* ─── DASHBOARD ─────────────────────────────────────────────────────────── */
+.pipeline-status {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+.status-active {
+  color: var(--green);
+  animation: pulse 2s ease-in-out infinite;
+}
+.status-waiting {
+  color: var(--border2);
+}
+
+/* ── DASHBOARD ── */
 .dashboard {
   min-height: 100vh;
   background: var(--black);
@@ -266,8 +324,8 @@ button {
   justify-content: space-between;
   padding: 16px 40px;
   border-bottom: 1px solid var(--border);
-  background: rgba(10, 10, 10, 0.95);
-  backdrop-filter: blur(12px);
+  background: rgba(8, 8, 8, 0.9);
+  backdrop-filter: blur(20px);
   position: sticky;
   top: 0;
   z-index: 100;
@@ -280,8 +338,8 @@ button {
 }
 
 .user-avatar {
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   border: 2px solid var(--green);
 }
@@ -289,28 +347,30 @@ button {
 .user-name {
   font-size: 14px;
   font-weight: 600;
-  color: var(--gray-200);
+  color: var(--gray-400);
 }
 
 .logout-btn {
   font-family: "Space Mono", monospace;
-  font-size: 13px;
-  color: var(--gray-400);
+  font-size: 12px;
+  color: var(--gray-600);
   padding: 6px 14px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--border2);
   border-radius: 8px;
   transition: all 0.2s;
+  cursor: pointer;
+  background: none;
+  text-decoration: none;
 }
-
 .logout-btn:hover {
-  border-color: var(--red);
-  color: var(--red);
+  border-color: #ef4444;
+  color: #ef4444;
 }
 
 .dashboard-main {
   max-width: 1100px;
   margin: 0 auto;
-  padding: 40px 24px;
+  padding: 48px 24px;
 }
 
 .welcome-banner {
@@ -318,47 +378,41 @@ button {
   align-items: center;
   justify-content: space-between;
   background: var(--card-bg);
-  border: 1px solid var(--border);
-  border-left: 4px solid var(--green);
+  border: 1px solid var(--border2);
+  border-left: 3px solid var(--green);
   border-radius: 16px;
   padding: 32px 40px;
   margin-bottom: 32px;
 }
-
 .welcome-title {
-  font-size: 28px;
+  font-size: 26px;
   font-weight: 700;
   letter-spacing: -0.5px;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
-
 .welcome-sub {
   color: var(--gray-400);
-  font-size: 15px;
+  font-size: 14px;
 }
-
 .banner-stats {
   display: flex;
   gap: 40px;
 }
-
 .stat {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 4px;
 }
-
 .stat-num {
   font-family: "Space Mono", monospace;
-  font-size: 32px;
+  font-size: 28px;
   font-weight: 700;
   color: var(--green);
 }
-
 .stat-label {
-  font-size: 12px;
-  color: var(--gray-400);
+  font-size: 11px;
+  color: var(--gray-600);
   text-transform: uppercase;
   letter-spacing: 1px;
 }
@@ -368,36 +422,33 @@ button {
   align-items: center;
   gap: 8px;
   background: var(--card-bg);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border2);
   border-radius: 12px;
   padding: 14px 24px;
   margin-bottom: 40px;
   overflow-x: auto;
 }
-
 .pipeline-bar-step {
   font-family: "Space Mono", monospace;
-  font-size: 12px;
+  font-size: 11px;
   color: var(--gray-600);
   white-space: nowrap;
   padding: 4px 10px;
   border-radius: 6px;
 }
-
 .pipeline-bar-step.done {
   color: var(--green);
-  background: rgba(0, 255, 136, 0.1);
+  background: var(--green-dim);
 }
-
 .pipeline-bar-arrow {
-  color: var(--gray-600);
+  color: var(--border2);
   font-size: 14px;
 }
 
 .section-title {
-  font-size: 13px;
+  font-size: 11px;
   font-family: "Space Mono", monospace;
-  color: var(--gray-400);
+  color: var(--gray-600);
   text-transform: uppercase;
   letter-spacing: 2px;
   margin-bottom: 20px;
@@ -412,14 +463,14 @@ button {
 
 .repos-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
 }
 
 .repo-card {
   background: var(--card-bg);
-  border: 1px solid var(--border);
-  border-radius: 16px;
+  border: 1px solid var(--border2);
+  border-radius: 14px;
   padding: 24px;
   display: flex;
   flex-direction: column;
@@ -427,10 +478,10 @@ button {
   transition:
     border-color 0.2s,
     transform 0.2s;
+  cursor: pointer;
 }
-
 .repo-card:hover {
-  border-color: #333;
+  border-color: rgba(0, 255, 136, 0.2);
   transform: translateY(-2px);
 }
 
@@ -439,58 +490,52 @@ button {
   align-items: center;
   justify-content: space-between;
 }
-
 .repo-name {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 700;
   display: flex;
   align-items: center;
   gap: 8px;
 }
-
 .repo-icon {
-  font-size: 18px;
+  font-size: 16px;
 }
-
 .repo-lang {
   font-family: "Space Mono", monospace;
-  font-size: 11px;
+  font-size: 10px;
   color: var(--green);
-  background: rgba(0, 255, 136, 0.1);
-  border: 1px solid rgba(0, 255, 136, 0.2);
+  background: var(--green-dim);
+  border: 1px solid rgba(0, 255, 136, 0.15);
   padding: 3px 10px;
   border-radius: 100px;
 }
 
 .repo-updated {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--gray-600);
   font-family: "Space Mono", monospace;
 }
 
 .deploy-status {
   font-family: "Space Mono", monospace;
-  font-size: 12px;
+  font-size: 11px;
   padding: 8px 14px;
   border-radius: 8px;
 }
-
 .status-running {
-  background: rgba(245, 158, 11, 0.1);
-  color: var(--yellow);
-  border: 1px solid rgba(245, 158, 11, 0.2);
+  background: rgba(245, 158, 11, 0.08);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.15);
 }
-
 .status-live {
-  background: rgba(0, 255, 136, 0.1);
+  background: var(--green-dim);
   color: var(--green);
   border: 1px solid rgba(0, 255, 136, 0.2);
 }
-
 .status-error {
-  background: rgba(239, 68, 68, 0.1);
-  color: var(--red);
-  border: 1px solid rgba(239, 68, 68, 0.2);
+  background: rgba(239, 68, 68, 0.08);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.15);
 }
 
 .deploy-btn {
@@ -499,54 +544,43 @@ button {
   background: var(--green);
   color: var(--black);
   font-family: "Syne", sans-serif;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
   border: none;
   border-radius: 10px;
   transition: all 0.2s;
   margin-top: auto;
+  cursor: pointer;
 }
-
 .deploy-btn:hover:not(:disabled) {
-  background: var(--green-dark);
+  background: var(--white);
   transform: translateY(-1px);
 }
-
-.deploy-btn:disabled,
-.deploy-btn.deploying {
-  opacity: 0.5;
+.deploy-btn:disabled {
+  opacity: 0.4;
   cursor: not-allowed;
   transform: none;
 }
 
-/* ─── Responsive ─────────────────────────────────────────────────────────── */
-@media (max-width: 768px) {
+@media (max-width: 900px) {
   .login-main {
     flex-direction: column;
+    padding: 40px 24px;
     gap: 40px;
-    padding: 24px;
   }
-
-  .pipeline-visual {
-    flex-direction: row;
-    flex-wrap: wrap;
-    justify-content: center;
+  .hero-title {
+    font-size: 42px;
   }
-
-  .pipeline-line {
-    width: 30px;
-    height: 2px;
+  .pipeline-card {
+    width: 100%;
   }
-
-  .login-title {
-    font-size: 36px;
-  }
-
   .welcome-banner {
     flex-direction: column;
     gap: 24px;
   }
-
+  .login-header {
+    padding: 16px 24px;
+  }
   .dashboard-nav {
     padding: 12px 20px;
   }
