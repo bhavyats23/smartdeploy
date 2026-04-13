@@ -106,7 +106,9 @@ app.get(
 app.get(
   "/auth/github/callback",
   passport.authenticate("github", {
-    failureRedirect: process.env.CLIENT_URL + "?error=auth_failed",
+    failureRedirect:
+      (process.env.CLIENT_URL || "http://localhost:3000") +
+      "?error=auth_failed",
   }),
   (req, res) => {
     res.redirect(process.env.CLIENT_URL || "http://localhost:3000");
