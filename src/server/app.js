@@ -57,6 +57,9 @@ passport.use(
         avatar: profile.photos[0]?.value || "",
         email: profile.emails?.[0]?.value || "",
         accessToken: accessToken,
+        // Keep photos array so Dashboard.jsx avatar works
+        photos: profile.photos || [],
+        displayName: profile.displayName || profile.username,
       };
       return done(null, user);
     },
@@ -73,6 +76,16 @@ app.get("/api/health", (req, res) => {
 });
 
 // ─── Auth Routes ──────────────────────────────────────────────────────────────
+
+// ✅ NEW — this is what App.jsx + Dashboard.jsx call on load
+app.get("/auth/user", (req, res) => {
+  if (req.isAuthenticated()) {
+    res.json(req.user);
+  } else {
+    res.status(401).json({ error: "Not logged in" });
+  }
+});
+
 app.get("/api/auth/status", (req, res) => {
   if (req.isAuthenticated()) {
     res.json({ loggedIn: true, user: req.user });
@@ -96,8 +109,7 @@ app.get(
     failureRedirect: process.env.CLIENT_URL + "?error=auth_failed",
   }),
   (req, res) => {
-    // Success — send user to dashboard
-    res.redirect(process.env.CLIENT_URL + "/dashboard");
+    res.redirect(process.env.CLIENT_URL || "http://localhost:3000");
   },
 );
 
@@ -129,10 +141,12 @@ app.get("/api/repos", async (req, res) => {
       repos.map((r) => ({
         id: r.id,
         name: r.name,
-        language: r.language || "Unknown",
+        description: r.description || "",
+        language: r.language || null,
         updated_at: r.updated_at?.split("T")[0],
         private: r.private,
         url: r.html_url,
+        stargazers_count: r.stargazers_count || 0,
       })),
     );
   } catch (err) {
@@ -142,16 +156,37 @@ app.get("/api/repos", async (req, res) => {
 });
 
 // ─── Deploy Route ─────────────────────────────────────────────────────────────
+const { exec } = require("child_process");
+
 app.post("/api/deploy", (req, res) => {
   if (!req.isAuthenticated()) {
     return res.status(401).json({ error: "Not logged in" });
   }
-  const { repoName } = req.body;
-  console.log(`Deploy triggered for: ${repoName} by ${req.user.username}`);
-  res.json({
-    success: true,
-    message: `Deployment started for ${repoName}`,
-    jobId: "job_" + Date.now(),
+
+  const { repoName, repoUrl } = req.body;
+  const dockerUser = "bhavyats23";
+  const imageName = `${dockerUser}/${repoName.toLowerCase()}`;
+  const jobId = "job_" + Date.now();
+
+  console.log(`🚀 Deploy started for: ${repoName} by ${req.user.username}`);
+
+  // Respond immediately so frontend can start showing logs
+  res.json({ success: true, jobId, imageName });
+
+  // Run Docker build + push in background
+  const commands = [
+    `docker build -t ${imageName} .`,
+    `docker login -u ${dockerUser} -p ${process.env.DOCKER_PASSWORD}`,
+    `docker push ${imageName}`,
+  ].join(" && ");
+
+  exec(commands, { cwd: process.cwd() }, (error, stdout, stderr) => {
+    if (error) {
+      console.error(`❌ Deploy failed for ${repoName}:`, error.message);
+      return;
+    }
+    console.log(`✅ Deploy success for ${repoName}`);
+    console.log(stdout);
   });
 });
 
