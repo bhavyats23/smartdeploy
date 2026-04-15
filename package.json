@@ -4,7 +4,7 @@
   "description": "SmartDeploy - Automated CI/CD Platform",
   "main": "app.js",
   "scripts": {
-    "start": "concurrently \"node src/server/app.js\" \"vite\"",
+    "start": "node src/server/app.js",
     "dev": "concurrently \"nodemon src/server/app.js\" \"vite\"",
     "build": "vite build",
     "preview": "vite preview"
