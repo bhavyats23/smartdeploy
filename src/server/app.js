@@ -1,25 +1,31 @@
-﻿const express = require("express");
+﻿require("dotenv").config();
+const express = require("express");
 const cors = require("cors");
 const path = require("path");
 const session = require("express-session");
 const passport = require("passport");
 const GitHubStrategy = require("passport-github2").Strategy;
-require("dotenv").config();
 
 const app = express();
 
 const CLIENT_URL = process.env.CLIENT_URL || "http://localhost:3000";
+const isProduction = process.env.NODE_ENV === "production";
 
 app.use(cors({ origin: CLIENT_URL, credentials: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+app.set("trust proxy", 1);
 
 app.use(
   session({
     secret: process.env.SESSION_SECRET || "smartdeploy_secret",
     resave: false,
     saveUninitialized: false,
-    cookie: { secure: false, maxAge: 24 * 60 * 60 * 1000 },
+    cookie: {
+      secure: isProduction,
+      maxAge: 24 * 60 * 60 * 1000,
+    },
   }),
 );
 
@@ -36,7 +42,7 @@ passport.use(
       clientSecret: process.env.GITHUB_CLIENT_SECRET,
       callbackURL:
         process.env.GITHUB_CALLBACK_URL ||
-        "http://localhost:5000/auth/github/callback",
+        "http://localhost:3000/auth/github/callback",
     },
     (accessToken, refreshToken, profile, done) => {
       const user = {
@@ -152,14 +158,14 @@ app.post("/api/deploy", (req, res) => {
   });
 });
 
-if (process.env.NODE_ENV === "production") {
+if (isProduction) {
   app.use(express.static(path.join(__dirname, "../../dist")));
   app.use((req, res) => {
     res.sendFile(path.join(__dirname, "../../dist/index.html"));
   });
 }
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Server running on port ${PORT}`);
 });
