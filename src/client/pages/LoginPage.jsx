@@ -1,73 +1,96 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect } from "react";
 
 export default function LoginPage() {
-  const [mousePos, setMousePos] = useState({ x: 0, y: 0 })
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
 
   useEffect(() => {
-    const h = (e) => setMousePos({ x: e.clientX, y: e.clientY })
-    window.addEventListener('mousemove', h)
-    return () => window.removeEventListener('mousemove', h)
-  }, [])
+    const h = (e) => setMousePos({ x: e.clientX, y: e.clientY });
+    window.addEventListener("mousemove", h);
+    return () => window.removeEventListener("mousemove", h);
+  }, []);
 
   const steps = [
-    { icon: '1', label: 'GitHub',  sub: 'Source connected',   active: true  },
-    { icon: '2', label: 'Build',   sub: 'npm install + build', active: false },
-    { icon: '3', label: 'Test',    sub: 'Jest test runner',    active: false },
-    { icon: '4', label: 'Quality', sub: 'SonarCloud gate',     active: false },
-    { icon: '5', label: 'Docker',  sub: 'Container packaged',  active: false },
-    { icon: '6', label: 'Live',    sub: 'Railway.app deploy',  active: false },
-  ]
+    { icon: "1", label: "GitHub", sub: "Source connected", active: true },
+    { icon: "2", label: "Build", sub: "npm install + build", active: false },
+    { icon: "3", label: "Test", sub: "Jest test runner", active: false },
+    { icon: "4", label: "Quality", sub: "SonarCloud gate", active: false },
+    { icon: "5", label: "Docker", sub: "Container packaged", active: false },
+    { icon: "6", label: "Live", sub: "Railway.app deploy", active: false },
+  ];
 
   return (
-    <div className='login-page'>
-      <div className='mouse-glow' style={{ left: mousePos.x - 200, top: mousePos.y - 200 }} />
-      <div className='bg-grid' />
-      <header className='login-header'>
-        <div className='logo'>
-          <span className='logo-icon'>▲</span>
-          <span className='logo-text'>SmartDeploy</span>
+    <div className="login-page">
+      <div
+        className="mouse-glow"
+        style={{ left: mousePos.x - 200, top: mousePos.y - 200 }}
+      />
+      <div className="bg-grid" />
+      <header className="login-header">
+        <div className="logo">
+          <span className="logo-icon">▲</span>
+          <span className="logo-text">SmartDeploy</span>
         </div>
-        <span className='nav-tag'>v1.0.0</span>
+        <span className="nav-tag">v1.0.0</span>
       </header>
-      <main className='login-main'>
-        <div className='hero-left'>
-          <div className='floating-badge'>
-            <span className='badge-dot'></span>
+      <main className="login-main">
+        <div className="hero-left">
+          <div className="floating-badge">
+            <span className="badge-dot"></span>
             Powered by Jenkins · Docker · SonarCloud
           </div>
-          <h1 className='hero-title'>
+          <h1 className="hero-title">
             Ship your code
             <br />
-            <span className='hero-accent'>without the pain.</span>
+            <span className="hero-accent">without the pain.</span>
           </h1>
-          <p className='hero-desc'>
-            Connect GitHub. Pick a repo. Hit deploy. SmartDeploy handles the rest.
+          <p className="hero-desc">
+            Connect GitHub. Pick a repo. Hit deploy. SmartDeploy handles the
+            rest.
           </p>
-          <a href='http://localhost:5000/auth/github' className='github-btn'>
-            <svg width='20' height='20' viewBox='0 0 24 24' fill='currentColor'>
-              <path d='M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0 1 12 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z'/>
+          <a href="/auth/github" className="github-btn">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0 1 12 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z" />
             </svg>
             Continue with GitHub
-            <span className='btn-arrow'>→</span>
+            <span className="btn-arrow">→</span>
           </a>
-          <p className='hero-note'>Free forever · No credit card needed</p>
+          <p className="hero-note">Free forever · No credit card needed</p>
         </div>
-        <div className='hero-right'>
-          <div className='pipeline-card'>
-            <div className='pipeline-card-title'>Live Pipeline</div>
+        <div className="hero-right">
+          <div className="pipeline-card">
+            <div className="pipeline-card-title">Live Pipeline</div>
             {steps.map((step, i) => (
-              <div key={i} className='pipeline-row'>
-                <div className={'pipeline-icon-box ' + (step.active ? 'active' : '')}>{step.icon}</div>
-                <div className='pipeline-row-info'>
-                  <div className={'pipeline-row-label ' + (step.active ? 'active' : '')}>{step.label}</div>
-                  <div className='pipeline-row-sub'>{step.sub}</div>
+              <div key={i} className="pipeline-row">
+                <div
+                  className={
+                    "pipeline-icon-box " + (step.active ? "active" : "")
+                  }
+                >
+                  {step.icon}
                 </div>
-                <div className={'pipeline-status ' + (step.active ? 'status-active' : 'status-waiting')}>{step.active ? '●' : '○'}</div>
+                <div className="pipeline-row-info">
+                  <div
+                    className={
+                      "pipeline-row-label " + (step.active ? "active" : "")
+                    }
+                  >
+                    {step.label}
+                  </div>
+                  <div className="pipeline-row-sub">{step.sub}</div>
+                </div>
+                <div
+                  className={
+                    "pipeline-status " +
+                    (step.active ? "status-active" : "status-waiting")
+                  }
+                >
+                  {step.active ? "●" : "○"}
+                </div>
               </div>
             ))}
           </div>
         </div>
       </main>
     </div>
-  )
+  );
 }
