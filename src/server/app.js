@@ -24,6 +24,7 @@ app.use(
     saveUninitialized: false,
     cookie: {
       secure: isProduction,
+      sameSite: isProduction ? "none" : "lax", // ✅ FIXED: required for cross-origin cookies
       maxAge: 24 * 60 * 60 * 1000,
     },
   }),
@@ -90,7 +91,7 @@ app.get(
     failureRedirect: CLIENT_URL + "?error=auth_failed",
   }),
   (req, res) => {
-    res.redirect(CLIENT_URL);
+    res.redirect(CLIENT_URL + "/dashboard"); // ✅ FIXED: redirect to dashboard after login
   },
 );
 
@@ -158,10 +159,11 @@ app.post("/api/deploy", (req, res) => {
   });
 });
 
+// ✅ FIXED: correct path — server/ is one level inside project root, dist/ is at root
 if (isProduction) {
-  app.use(express.static(path.join(__dirname, "../../dist")));
+  app.use(express.static(path.join(__dirname, "../dist")));
   app.use((req, res) => {
-    res.sendFile(path.join(__dirname, "../../dist/index.html"));
+    res.sendFile(path.join(__dirname, "../dist/index.html"));
   });
 }
 
