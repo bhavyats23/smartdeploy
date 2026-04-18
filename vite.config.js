@@ -1,33 +1,17 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
-export default defineConfig(({ command }) => ({
+export default defineConfig({
   plugins: [react()],
-
-  server: {
-    port: 3000,
-    // Proxy only runs in dev (vite dev server).
-    // In production the React build is served by Express on the same origin,
-    // so relative URLs like /auth/github resolve correctly without any proxy.
-    ...(command === "serve" && {
-      proxy: {
-        "/api": {
-          target: "http://localhost:3000",
-          changeOrigin: true,
-          secure: false,
-          credentials: true,
-        },
-        "/auth": {
-          target: "http://localhost:3000",
-          changeOrigin: true,
-          secure: false,
-          credentials: true,
-        },
-      },
-    }),
-  },
-
+  root: ".",
   build: {
     outDir: "dist",
   },
-}));
+  server: {
+    port: 3001,
+    proxy: {
+      "/auth": "http://localhost:3000",
+      "/api": "http://localhost:3000",
+    },
+  },
+});

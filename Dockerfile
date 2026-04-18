@@ -1,8 +1,9 @@
 FROM node:20-alpine
 WORKDIR /app
 COPY package*.json ./
-RUN npm install --include=dev
+RUN npm install
 COPY . .
 RUN npm run build
 EXPOSE 3000
-CMD ["node", "app.js"]# force rebuild
+ENV NODE_ENV=production
+CMD ["node", "app.js"]

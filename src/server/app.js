@@ -132,30 +132,85 @@ app.get("/api/repos", async (req, res) => {
   }
 });
 
-const { exec } = require("child_process");
-
-app.post("/api/deploy", (req, res) => {
+// ✅ NEW — Trigger Jenkins Pipeline
+app.post("/api/deploy", async (req, res) => {
   if (!req.isAuthenticated())
     return res.status(401).json({ error: "Not logged in" });
+
   const { repoName } = req.body;
-  const dockerUser = "bhavyats23";
-  const imageName = `${dockerUser}/${repoName.toLowerCase()}`;
   const jobId = "job_" + Date.now();
+
   console.log(`🚀 Deploy started for: ${repoName}`);
-  res.json({ success: true, jobId, imageName });
-  const commands = [
-    `docker build -t ${imageName} .`,
-    `docker login -u ${dockerUser} -p ${process.env.DOCKER_PASSWORD}`,
-    `docker push ${imageName}`,
-  ].join(" && ");
-  exec(commands, { cwd: process.cwd() }, (error, stdout) => {
-    if (error) {
-      console.error(`❌ Deploy failed:`, error.message);
-      return;
+
+  const jenkinsUrl = process.env.JENKINS_URL;
+  const jenkinsUser = process.env.JENKINS_USER;
+  const jenkinsToken = process.env.JENKINS_TOKEN;
+
+  const credentials = Buffer.from(`${jenkinsUser}:${jenkinsToken}`).toString(
+    "base64",
+  );
+
+  try {
+    const response = await fetch(
+      `${jenkinsUrl}/job/smartdeploy-pipeline/build`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Basic ${credentials}`,
+        },
+      },
+    );
+
+    if (
+      response.status === 201 ||
+      response.status === 200 ||
+      response.status === 302
+    ) {
+      console.log(`✅ Jenkins pipeline triggered for ${repoName}`);
+      res.json({
+        success: true,
+        jobId,
+        message: "Jenkins pipeline triggered!",
+      });
+    } else {
+      console.error(`❌ Jenkins returned status: ${response.status}`);
+      res.status(500).json({ error: "Failed to trigger Jenkins" });
     }
-    console.log(`✅ Deploy success for ${repoName}`);
-    console.log(stdout);
-  });
+  } catch (err) {
+    console.error("❌ Jenkins error:", err.message);
+    res.status(500).json({ error: "Could not connect to Jenkins" });
+  }
+});
+
+// ✅ NEW — Get Jenkins Build Status
+app.get("/api/deploy/status", async (req, res) => {
+  const jenkinsUrl = process.env.JENKINS_URL;
+  const jenkinsUser = process.env.JENKINS_USER;
+  const jenkinsToken = process.env.JENKINS_TOKEN;
+
+  const credentials = Buffer.from(`${jenkinsUser}:${jenkinsToken}`).toString(
+    "base64",
+  );
+
+  try {
+    const response = await fetch(
+      `${jenkinsUrl}/job/smartdeploy-pipeline/lastBuild/api/json`,
+      {
+        headers: {
+          Authorization: `Basic ${credentials}`,
+        },
+      },
+    );
+    const data = await response.json();
+    res.json({
+      building: data.building,
+      result: data.result,
+      duration: data.duration,
+      number: data.number,
+    });
+  } catch (err) {
+    res.status(500).json({ error: "Could not get build status" });
+  }
 });
 
 // ✅ Serve React frontend in production

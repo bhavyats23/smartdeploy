@@ -17,7 +17,6 @@ export default function Dashboard({ user }) {
   const [logs, setLogs] = useState([]);
   const [pipelineStep, setPipelineStep] = useState(-1);
 
-  // Fetch real GitHub repos
   useEffect(() => {
     fetch("/api/repos", { credentials: "include" })
       .then((r) => r.json())
@@ -28,7 +27,7 @@ export default function Dashboard({ user }) {
       .catch(() => setLoadingRepos(false));
   }, []);
 
-  // Simulate deploy pipeline (Day 4 will make this real)
+  // ✅ REAL deploy — calls Jenkins
   const handleDeploy = async (repo) => {
     setDeployingRepo(repo.name);
     setLogs([]);
@@ -40,27 +39,76 @@ export default function Dashboard({ user }) {
         { text: msg, time: new Date().toLocaleTimeString() },
       ]);
 
-    const steps = [
-      { label: "Cloning repository...", delay: 800 },
-      { label: "Installing dependencies...", delay: 1200 },
-      { label: "Running tests...", delay: 1000 },
-      { label: "Building Docker image...", delay: 1500 },
-      { label: "Pushing to DockerHub...", delay: 1200 },
-      { label: "Deploying to Railway...", delay: 1000 },
-    ];
+    addLog(`[CLONE] Triggering Jenkins pipeline for ${repo.name}...`);
 
-    for (let i = 0; i < steps.length; i++) {
-      setPipelineStep(i);
-      addLog(`[${PIPELINE_STEPS[i].toUpperCase()}] ${steps[i].label}`);
-      await new Promise((r) => setTimeout(r, steps[i].delay));
+    try {
+      const response = await fetch("/api/deploy", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ repoName: repo.name }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        addLog(`[JENKINS] Pipeline triggered successfully! ✅`);
+        addLog(`[JENKINS] Job ID: ${data.jobId}`);
+
+        // Poll Jenkins for build status
+        setPipelineStep(1);
+        addLog(`[INSTALL] Pipeline is running on Jenkins...`);
+
+        let attempts = 0;
+        const poll = setInterval(async () => {
+          attempts++;
+          try {
+            const statusRes = await fetch("/api/deploy/status", {
+              credentials: "include",
+            });
+            const statusData = await statusRes.json();
+
+            if (statusData.building) {
+              setPipelineStep((prev) => Math.min(prev + 1, 5));
+              addLog(`[RUNNING] Build #${statusData.number} in progress...`);
+            } else if (statusData.result === "SUCCESS") {
+              clearInterval(poll);
+              setPipelineStep(5);
+              addLog(`[DEPLOY] Build #${statusData.number} completed!`);
+              addLog(`✅ Deployment complete! Pipeline ran successfully.`);
+              setDeployStatus((prev) => ({ ...prev, [repo.name]: "live" }));
+              setDeployingRepo(null);
+              setPipelineStep(-1);
+            } else if (statusData.result === "FAILURE") {
+              clearInterval(poll);
+              addLog(`❌ Build failed! Check Jenkins for details.`);
+              setDeployingRepo(null);
+              setPipelineStep(-1);
+            }
+
+            if (attempts > 20) {
+              clearInterval(poll);
+              addLog(`⚠️ Timeout — check Jenkins at http://localhost:8080`);
+              setDeployingRepo(null);
+              setPipelineStep(-1);
+            }
+          } catch (err) {
+            clearInterval(poll);
+            addLog(`❌ Error checking build status.`);
+            setDeployingRepo(null);
+            setPipelineStep(-1);
+          }
+        }, 3000);
+      } else {
+        addLog(`❌ Failed to trigger Jenkins: ${data.error}`);
+        setDeployingRepo(null);
+        setPipelineStep(-1);
+      }
+    } catch (err) {
+      addLog(`❌ Error connecting to server: ${err.message}`);
+      setDeployingRepo(null);
+      setPipelineStep(-1);
     }
-
-    addLog(
-      "✅ Deployment complete! Live at https://smartdeploy.up.railway.app",
-    );
-    setDeployStatus((prev) => ({ ...prev, [repo.name]: "live" }));
-    setDeployingRepo(null);
-    setPipelineStep(-1);
   };
 
   const formatDate = (dateStr) => {
@@ -259,7 +307,9 @@ export default function Dashboard({ user }) {
                       style={{
                         color: log.text.startsWith("✅")
                           ? "var(--green)"
-                          : "#e0e0e0",
+                          : log.text.startsWith("❌")
+                            ? "#ff4444"
+                            : "#e0e0e0",
                       }}
                     >
                       {log.text}

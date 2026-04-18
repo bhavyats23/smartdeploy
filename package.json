@@ -2,11 +2,11 @@
   "name": "smartdeploy",
   "version": "1.0.0",
   "description": "SmartDeploy - Automated CI/CD Platform",
-  "main": "server/app.js",
+  "main": "app.js",
   "type": "commonjs",
   "scripts": {
     "start": "node app.js",
-    "dev": "concurrently \"nodemon server/app.js\" \"vite\"",
+    "dev": "concurrently \"nodemon src/server/app.js\" \"vite\"",
     "build": "vite build",
     "preview": "vite preview"
   },
