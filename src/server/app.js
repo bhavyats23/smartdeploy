@@ -160,9 +160,10 @@ app.post("/api/deploy", (req, res) => {
 
 // ✅ Serve React frontend in production
 if (isProduction) {
-  app.use(express.static(path.join(__dirname, "../../dist")));
+  const distPath = path.join(__dirname, "..", "..", "dist");
+  app.use(express.static(distPath));
   app.get("*", (req, res) => {
-    res.sendFile(path.join(__dirname, "../../dist", "index.html"));
+    res.sendFile(path.join(distPath, "index.html"));
   });
 }
 
