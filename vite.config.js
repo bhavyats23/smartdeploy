@@ -12,13 +12,13 @@ export default defineConfig(({ command }) => ({
     ...(command === "serve" && {
       proxy: {
         "/api": {
-          target: "http://localhost:5000",
+          target: "http://localhost:3000",
           changeOrigin: true,
           secure: false,
           credentials: true,
         },
         "/auth": {
-          target: "http://localhost:5000",
+          target: "http://localhost:3000",
           changeOrigin: true,
           secure: false,
           credentials: true,

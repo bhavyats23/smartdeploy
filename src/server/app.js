@@ -14,7 +14,6 @@ const isProduction = process.env.NODE_ENV === "production";
 app.use(cors({ origin: CLIENT_URL, credentials: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
 app.set("trust proxy", 1);
 
 app.use(
@@ -24,7 +23,7 @@ app.use(
     saveUninitialized: false,
     cookie: {
       secure: isProduction,
-      sameSite: isProduction ? "none" : "lax", // ✅ FIXED: required for cross-origin cookies
+      sameSite: isProduction ? "none" : "lax",
       maxAge: 24 * 60 * 60 * 1000,
     },
   }),
@@ -91,7 +90,7 @@ app.get(
     failureRedirect: CLIENT_URL + "?error=auth_failed",
   }),
   (req, res) => {
-    res.redirect(CLIENT_URL + "/dashboard"); // ✅ FIXED: redirect to dashboard after login
+    res.redirect(CLIENT_URL + "/dashboard");
   },
 );
 
@@ -159,11 +158,11 @@ app.post("/api/deploy", (req, res) => {
   });
 });
 
-// ✅ FIXED: correct path — server/ is one level inside project root, dist/ is at root
+// ✅ Serve React frontend in production
 if (isProduction) {
-  app.use(express.static(path.join(__dirname, "../dist")));
-  app.use((req, res) => {
-    res.sendFile(path.join(__dirname, "../dist/index.html"));
+  app.use(express.static(path.join(__dirname, "../../dist")));
+  app.get("*", (req, res) => {
+    res.sendFile(path.join(__dirname, "../../dist", "index.html"));
   });
 }
 
