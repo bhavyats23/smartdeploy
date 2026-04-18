@@ -1,4 +1,7 @@
 ﻿require("dotenv").config();
+const mongoose = require("mongoose");
+const Deployment = require("./models/Deployment");
+const { sendDeploymentEmail } = require("./emailService");
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
@@ -132,13 +135,12 @@ app.get("/api/repos", async (req, res) => {
   }
 });
 
-// ✅ NEW — Trigger Jenkins Pipeline
+// Trigger Jenkins Pipeline + Save to MongoDB
 app.post("/api/deploy", async (req, res) => {
   if (!req.isAuthenticated())
     return res.status(401).json({ error: "Not logged in" });
 
-  const { repoName } = req.body;
-  const jobId = "job_" + Date.now();
+  const { repoName, repoUrl } = req.body;
 
   console.log(`🚀 Deploy started for: ${repoName}`);
 
@@ -166,10 +168,31 @@ app.post("/api/deploy", async (req, res) => {
       response.status === 200 ||
       response.status === 302
     ) {
-      console.log(`✅ Jenkins pipeline triggered for ${repoName}`);
+      // Save deployment to MongoDB
+      const deployment = new Deployment({
+        repoName: repoName,
+        repoUrl: repoUrl || `https://github.com/${repoName}`,
+        status: "running",
+      });
+      await deployment.save();
+
+      console.log(`✅ Jenkins triggered + saved to MongoDB for ${repoName}`);
+
+      // 📧 Send email — deploy started
+      try {
+        await sendDeploymentEmail(
+          repoName,
+          "started",
+          "Jenkins pipeline has been triggered. Build is now running...",
+        );
+        console.log(`📧 Start email sent for ${repoName}`);
+      } catch (emailErr) {
+        console.error("📧 Email error (non-fatal):", emailErr.message);
+      }
+
       res.json({
         success: true,
-        jobId,
+        deploymentId: deployment._id,
         message: "Jenkins pipeline triggered!",
       });
     } else {
@@ -182,7 +205,7 @@ app.post("/api/deploy", async (req, res) => {
   }
 });
 
-// ✅ NEW — Get Jenkins Build Status
+// Get Jenkins Build Status
 app.get("/api/deploy/status", async (req, res) => {
   const jenkinsUrl = process.env.JENKINS_URL;
   const jenkinsUser = process.env.JENKINS_USER;
@@ -202,6 +225,40 @@ app.get("/api/deploy/status", async (req, res) => {
       },
     );
     const data = await response.json();
+
+    // Update latest deployment status in MongoDB + send email
+    if (data.result) {
+      const updatedDeployment = await Deployment.findOneAndUpdate(
+        { status: "running" },
+        {
+          status: data.result === "SUCCESS" ? "success" : "failed",
+          jenkinsBuildNumber: data.number,
+          completedAt: new Date(),
+        },
+        { sort: { triggeredAt: -1 }, new: true },
+      );
+
+      // 📧 Send email when build finishes
+      if (updatedDeployment) {
+        const emailStatus = data.result === "SUCCESS" ? "success" : "failed";
+        const logs =
+          data.result === "SUCCESS"
+            ? `✅ Build #${data.number} completed successfully in ${Math.round(data.duration / 1000)}s`
+            : `❌ Build #${data.number} failed. Please check Jenkins for details.`;
+
+        try {
+          await sendDeploymentEmail(
+            updatedDeployment.repoName,
+            emailStatus,
+            logs,
+          );
+          console.log(`📧 Completion email sent — ${emailStatus}`);
+        } catch (emailErr) {
+          console.error("📧 Email error (non-fatal):", emailErr.message);
+        }
+      }
+    }
+
     res.json({
       building: data.building,
       result: data.result,
@@ -213,16 +270,43 @@ app.get("/api/deploy/status", async (req, res) => {
   }
 });
 
-// ✅ Serve React frontend in production
+// Get deployment history
+app.get("/api/deployments", async (req, res) => {
+  if (!req.isAuthenticated())
+    return res.status(401).json({ error: "Not logged in" });
+  try {
+    const deployments = await Deployment.find()
+      .sort({ triggeredAt: -1 })
+      .limit(10);
+    res.json(deployments);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch deployments" });
+  }
+});
+
+// Serve React frontend in production
 if (isProduction) {
-  const distPath = path.join(__dirname, "..", "..", "dist");
+  const distPath = path.join(__dirname, "../../dist");
   app.use(express.static(distPath));
   app.get("*", (req, res) => {
-    res.sendFile(path.join(distPath, "index.html"));
+    if (!req.path.startsWith("/api") && !req.path.startsWith("/auth")) {
+      res.sendFile(path.join(distPath, "index.html"));
+    }
   });
 }
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Server running on port ${PORT}`);
-});
+
+// Connect to MongoDB FIRST, then start server
+mongoose
+  .connect(process.env.MONGODB_URI)
+  .then(() => {
+    console.log("✅ MongoDB connected!");
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`🚀 Server running on port ${PORT}`);
+    });
+  })
+  .catch((err) => {
+    console.error("❌ MongoDB connection failed:", err);
+    process.exit(1);
+  });
