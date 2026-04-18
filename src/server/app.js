@@ -288,7 +288,7 @@ app.get("/api/deployments", async (req, res) => {
 if (isProduction) {
   const distPath = path.join(__dirname, "../../dist");
   app.use(express.static(distPath));
-  app.get("*", (req, res) => {
+  app.get("*splat", (req, res) => {
     if (!req.path.startsWith("/api") && !req.path.startsWith("/auth")) {
       res.sendFile(path.join(distPath, "index.html"));
     }
