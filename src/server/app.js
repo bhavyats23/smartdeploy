@@ -4,14 +4,13 @@ const Deployment = require("./models/Deployment");
 const { sendDeploymentEmail } = require("./emailService");
 const express = require("express");
 const cors = require("cors");
-const path = require("path");
 const session = require("express-session");
 const passport = require("passport");
 const GitHubStrategy = require("passport-github2").Strategy;
 
 const app = express();
 
-const CLIENT_URL = process.env.CLIENT_URL || "http://localhost:3000";
+const CLIENT_URL = process.env.CLIENT_URL || "http://localhost:3002";
 const isProduction = process.env.NODE_ENV === "production";
 
 app.use(cors({ origin: CLIENT_URL, credentials: true }));
@@ -156,7 +155,7 @@ app.post("/api/deploy", async (req, res) => {
     "base64",
   );
 
-  // ✅ STEP 1: Save to MongoDB FIRST so we have the _id to pass to Jenkins
+  // ✅ STEP 1: Save to MongoDB FIRST
   let deployment;
   try {
     deployment = new Deployment({
@@ -172,14 +171,14 @@ app.post("/api/deploy", async (req, res) => {
     return res.status(500).json({ error: "Failed to save deployment record" });
   }
 
-  // ✅ STEP 2: Get the ngrok/backend URL so Jenkins can call back
+  // ✅ STEP 2: Get backend URL for Jenkins callback
   const backendUrl =
+    process.env.RENDER_EXTERNAL_URL ||
     process.env.NGROK_URL ||
-    process.env.JENKINS_URL?.replace(":8080", ":3000") ||
     "http://localhost:3000";
 
   try {
-    // ✅ STEP 3: Trigger Jenkins — now passes DEPLOYMENT_ID and BACKEND_URL too
+    // ✅ STEP 3: Trigger Jenkins
     const triggerUrl =
       `${jenkinsUrl}/job/smartdeploy-pipeline/buildWithParameters` +
       `?REPO_URL=${encodeURIComponent(fullRepoUrl)}` +
@@ -199,7 +198,6 @@ app.post("/api/deploy", async (req, res) => {
         `✅ Jenkins triggered for ${repoName} (deploymentId: ${deployment._id})`,
       );
 
-      // Send start email
       try {
         await sendDeploymentEmail(
           repoName,
@@ -218,7 +216,6 @@ app.post("/api/deploy", async (req, res) => {
       });
     } else {
       console.error(`❌ Jenkins returned status: ${response.status}`);
-      // Mark the deployment as failed since Jenkins didn't accept it
       await Deployment.findByIdAndUpdate(deployment._id, {
         status: "failed",
         completedAt: new Date(),
@@ -229,7 +226,6 @@ app.post("/api/deploy", async (req, res) => {
     }
   } catch (err) {
     console.error("❌ Jenkins error:", err.message);
-    // Mark the deployment as failed
     await Deployment.findByIdAndUpdate(deployment._id, {
       status: "failed",
       completedAt: new Date(),
@@ -238,8 +234,7 @@ app.post("/api/deploy", async (req, res) => {
   }
 });
 
-// ==================== JENKINS CALLBACK — UPDATE DEPLOYMENT WITH LIVE URL ====================
-// ✅ This is the new route — Jenkins calls this when deploy is done
+// ==================== JENKINS CALLBACK ====================
 app.post("/api/deployments/:id/update", async (req, res) => {
   try {
     const { status, liveUrl } = req.body;
@@ -265,15 +260,14 @@ app.post("/api/deployments/:id/update", async (req, res) => {
     }
 
     console.log(
-      `✅ Deployment updated in MongoDB — status: ${status}, liveUrl: ${liveUrl}`,
+      `✅ Deployment updated — status: ${status}, liveUrl: ${liveUrl}`,
     );
 
-    // Send completion email
     try {
       const emailStatus = status === "success" ? "success" : "failed";
       const logs =
         status === "success"
-          ? `✅ Build completed successfully!\n🔗 Live URL: ${liveUrl || "Check Railway dashboard"}`
+          ? `✅ Build completed!\n🔗 Live URL: ${liveUrl || "Check Jenkins dashboard"}`
           : `❌ Build failed. Please check Jenkins for details.`;
       await sendDeploymentEmail(deployment.repoName, emailStatus, logs);
       console.log(`📧 Completion email sent — ${emailStatus}`);
@@ -288,7 +282,7 @@ app.post("/api/deployments/:id/update", async (req, res) => {
   }
 });
 
-// ==================== GET BUILD STATUS + LIVE URL ====================
+// ==================== GET BUILD STATUS ====================
 app.get("/api/deploy/status", async (req, res) => {
   const jenkinsUrl = process.env.JENKINS_URL;
   const jenkinsUser = process.env.JENKINS_USER;
@@ -306,7 +300,6 @@ app.get("/api/deploy/status", async (req, res) => {
     );
     const data = await response.json();
 
-    // Extract LIVE_URL from Jenkins console output
     let liveUrl = null;
     try {
       const logRes = await fetch(
@@ -314,8 +307,6 @@ app.get("/api/deploy/status", async (req, res) => {
         { headers: { Authorization: `Basic ${credentials}` } },
       );
       const logText = await logRes.text();
-
-      // Look for LIVE_URL line in console
       const urlMatch = logText.match(/LIVE_URL=(https:\/\/[^\s\r\n]+)/);
       if (urlMatch) {
         liveUrl = urlMatch[1];
@@ -352,7 +343,7 @@ app.get("/api/deployments", async (req, res) => {
   }
 });
 
-// ==================== GET STATS FOR DASHBOARD ====================
+// ==================== GET STATS ====================
 app.get("/api/stats", async (req, res) => {
   if (!req.isAuthenticated())
     return res.status(401).json({ error: "Not logged in" });
@@ -367,20 +358,9 @@ app.get("/api/stats", async (req, res) => {
   }
 });
 
-// ==================== SERVE REACT FRONTEND ====================
-if (isProduction) {
-  const distPath = path.join(__dirname, "../../dist");
-  app.use(express.static(distPath));
-  app.get("*splat", (req, res) => {
-    if (!req.path.startsWith("/api") && !req.path.startsWith("/auth")) {
-      res.sendFile(path.join(distPath, "index.html"));
-    }
-  });
-}
-
+// ==================== CONNECT DB & START SERVER ====================
 const PORT = process.env.PORT || 3000;
 
-// Connect to MongoDB FIRST, then start server
 mongoose
   .connect(process.env.MONGODB_URI)
   .then(() => {
