@@ -21,6 +21,14 @@ const deploymentSchema = new mongoose.Schema({
     type: String,
     default: "",
   },
+  liveUrl: {
+    type: String,
+    default: "",
+  },
+  triggeredBy: {
+    type: String,
+    default: "",
+  },
   triggeredAt: {
     type: Date,
     default: Date.now,

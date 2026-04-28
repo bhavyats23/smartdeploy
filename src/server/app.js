@@ -63,6 +63,7 @@ passport.use(
   ),
 );
 
+// ==================== HEALTH CHECK ====================
 app.get("/api/health", (req, res) => {
   res.json({
     status: "OK",
@@ -71,6 +72,7 @@ app.get("/api/health", (req, res) => {
   });
 });
 
+// ==================== AUTH ROUTES ====================
 app.get("/auth/user", (req, res) => {
   if (req.isAuthenticated()) return res.json(req.user);
   res.status(401).json({ error: "Not logged in" });
@@ -103,6 +105,7 @@ app.get("/auth/logout", (req, res) => {
   });
 });
 
+// ==================== GITHUB REPOS ====================
 app.get("/api/repos", async (req, res) => {
   if (!req.isAuthenticated())
     return res.status(401).json({ error: "Not logged in" });
@@ -135,55 +138,53 @@ app.get("/api/repos", async (req, res) => {
   }
 });
 
-// Trigger Jenkins Pipeline + Save to MongoDB
+// ==================== TRIGGER JENKINS PIPELINE ====================
 app.post("/api/deploy", async (req, res) => {
   if (!req.isAuthenticated())
     return res.status(401).json({ error: "Not logged in" });
 
   const { repoName, repoUrl } = req.body;
+  const fullRepoUrl =
+    repoUrl || `https://github.com/${req.user.username}/${repoName}`;
 
-  console.log(`🚀 Deploy started for: ${repoName}`);
+  console.log(`🚀 Deploy started for: ${repoName} — ${fullRepoUrl}`);
 
   const jenkinsUrl = process.env.JENKINS_URL;
   const jenkinsUser = process.env.JENKINS_USER;
   const jenkinsToken = process.env.JENKINS_TOKEN;
-
   const credentials = Buffer.from(`${jenkinsUser}:${jenkinsToken}`).toString(
     "base64",
   );
 
   try {
-    const response = await fetch(
-      `${jenkinsUrl}/job/smartdeploy-pipeline/build`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Basic ${credentials}`,
-        },
-      },
-    );
+    // Trigger Jenkins with repo URL as a parameter
+    const triggerUrl = `${jenkinsUrl}/job/smartdeploy-pipeline/buildWithParameters?REPO_URL=${encodeURIComponent(fullRepoUrl)}&REPO_NAME=${encodeURIComponent(repoName)}`;
 
-    if (
-      response.status === 201 ||
-      response.status === 200 ||
-      response.status === 302
-    ) {
+    const response = await fetch(triggerUrl, {
+      method: "POST",
+      headers: {
+        Authorization: `Basic ${credentials}`,
+      },
+    });
+
+    if ([200, 201, 302].includes(response.status)) {
       // Save deployment to MongoDB
       const deployment = new Deployment({
         repoName: repoName,
-        repoUrl: repoUrl || `https://github.com/${repoName}`,
+        repoUrl: fullRepoUrl,
         status: "running",
+        triggeredBy: req.user.username,
       });
       await deployment.save();
 
       console.log(`✅ Jenkins triggered + saved to MongoDB for ${repoName}`);
 
-      // 📧 Send email — deploy started
+      // Send start email
       try {
         await sendDeploymentEmail(
           repoName,
           "started",
-          "Jenkins pipeline has been triggered. Build is now running...",
+          `Jenkins pipeline triggered for ${fullRepoUrl}. Build is now running...`,
         );
         console.log(`📧 Start email sent for ${repoName}`);
       } catch (emailErr) {
@@ -197,7 +198,9 @@ app.post("/api/deploy", async (req, res) => {
       });
     } else {
       console.error(`❌ Jenkins returned status: ${response.status}`);
-      res.status(500).json({ error: "Failed to trigger Jenkins" });
+      res.status(500).json({
+        error: `Failed to trigger Jenkins (status ${response.status})`,
+      });
     }
   } catch (err) {
     console.error("❌ Jenkins error:", err.message);
@@ -205,12 +208,11 @@ app.post("/api/deploy", async (req, res) => {
   }
 });
 
-// Get Jenkins Build Status
+// ==================== GET BUILD STATUS + LIVE URL ====================
 app.get("/api/deploy/status", async (req, res) => {
   const jenkinsUrl = process.env.JENKINS_URL;
   const jenkinsUser = process.env.JENKINS_USER;
   const jenkinsToken = process.env.JENKINS_TOKEN;
-
   const credentials = Buffer.from(`${jenkinsUser}:${jenkinsToken}`).toString(
     "base64",
   );
@@ -219,31 +221,53 @@ app.get("/api/deploy/status", async (req, res) => {
     const response = await fetch(
       `${jenkinsUrl}/job/smartdeploy-pipeline/lastBuild/api/json`,
       {
-        headers: {
-          Authorization: `Basic ${credentials}`,
-        },
+        headers: { Authorization: `Basic ${credentials}` },
       },
     );
     const data = await response.json();
 
-    // Update latest deployment status in MongoDB + send email
+    // Extract LIVE_URL from Jenkins console output
+    let liveUrl = null;
+    try {
+      const logRes = await fetch(
+        `${jenkinsUrl}/job/smartdeploy-pipeline/lastBuild/consoleText`,
+        { headers: { Authorization: `Basic ${credentials}` } },
+      );
+      const logText = await logRes.text();
+
+      // Look for LIVE_URL line in console
+      const urlMatch = logText.match(/LIVE_URL=(https:\/\/[^\s\r\n]+)/);
+      if (urlMatch) {
+        liveUrl = urlMatch[1];
+        console.log(`🔗 Live URL found: ${liveUrl}`);
+      }
+    } catch (logErr) {
+      console.error("Could not fetch Jenkins log:", logErr.message);
+    }
+
+    // Update MongoDB deployment record when build finishes
     if (data.result) {
+      const updateData = {
+        status: data.result === "SUCCESS" ? "success" : "failed",
+        jenkinsBuildNumber: data.number,
+        completedAt: new Date(),
+      };
+
+      // Save live URL if found
+      if (liveUrl) updateData.liveUrl = liveUrl;
+
       const updatedDeployment = await Deployment.findOneAndUpdate(
         { status: "running" },
-        {
-          status: data.result === "SUCCESS" ? "success" : "failed",
-          jenkinsBuildNumber: data.number,
-          completedAt: new Date(),
-        },
+        updateData,
         { sort: { triggeredAt: -1 }, new: true },
       );
 
-      // 📧 Send email when build finishes
+      // Send completion email
       if (updatedDeployment) {
         const emailStatus = data.result === "SUCCESS" ? "success" : "failed";
         const logs =
           data.result === "SUCCESS"
-            ? `✅ Build #${data.number} completed successfully in ${Math.round(data.duration / 1000)}s`
+            ? `✅ Build #${data.number} completed successfully!\n🔗 Live URL: ${liveUrl || "Check Railway dashboard"}`
             : `❌ Build #${data.number} failed. Please check Jenkins for details.`;
 
         try {
@@ -264,27 +288,44 @@ app.get("/api/deploy/status", async (req, res) => {
       result: data.result,
       duration: data.duration,
       number: data.number,
+      liveUrl: liveUrl,
     });
   } catch (err) {
+    console.error("Status check error:", err.message);
     res.status(500).json({ error: "Could not get build status" });
   }
 });
 
-// Get deployment history
+// ==================== GET DEPLOYMENT HISTORY ====================
 app.get("/api/deployments", async (req, res) => {
   if (!req.isAuthenticated())
     return res.status(401).json({ error: "Not logged in" });
   try {
     const deployments = await Deployment.find()
       .sort({ triggeredAt: -1 })
-      .limit(10);
+      .limit(20);
     res.json(deployments);
   } catch (err) {
     res.status(500).json({ error: "Failed to fetch deployments" });
   }
 });
 
-// Serve React frontend in production
+// ==================== GET STATS FOR DASHBOARD ====================
+app.get("/api/stats", async (req, res) => {
+  if (!req.isAuthenticated())
+    return res.status(401).json({ error: "Not logged in" });
+  try {
+    const total = await Deployment.countDocuments();
+    const success = await Deployment.countDocuments({ status: "success" });
+    const failed = await Deployment.countDocuments({ status: "failed" });
+    const running = await Deployment.countDocuments({ status: "running" });
+    res.json({ total, success, failed, running });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch stats" });
+  }
+});
+
+// ==================== SERVE REACT FRONTEND ====================
 if (isProduction) {
   const distPath = path.join(__dirname, "../../dist");
   app.use(express.static(distPath));
