@@ -6,6 +6,10 @@ pipeline {
         string(name: 'REPO_NAME', defaultValue: 'smartdeploy', description: 'Repository name')
     }
 
+    environment {
+        RAILWAY_TOKEN = '4fccaedf-f7f1-4a3a-b9e7-f3838cf2e1d5'
+    }
+
     stages {
 
         stage('Clone') {
@@ -51,15 +55,30 @@ pipeline {
             steps {
                 echo "Deploying ${params.REPO_NAME} to Railway..."
                 script {
-                    // This is where Railway deployment happens
-                    // The live URL is printed so SmartDeploy backend can extract it
-                    def liveUrl = "https://smartdeploy-production.up.railway.app"
-                    echo "LIVE_URL=${liveUrl}"
-                    echo "Deployment complete for ${params.REPO_NAME}!"
+                    dir('repo') {
+                        // Create a new Railway project and deploy
+                        def output = bat(
+                            script: """
+                                set RAILWAY_TOKEN=${RAILWAY_TOKEN}
+                                railway init --name ${params.REPO_NAME} -y 2>&1 || echo Init done
+                                railway up --detach 2>&1
+                                railway domain 2>&1
+                            """,
+                            returnStdout: true
+                        ).trim()
+
+                        echo "Railway output: ${output}"
+
+                        // Extract the live URL
+                        def urlMatcher = output =~ /https:\/\/[a-zA-Z0-9\-]+\.up\.railway\.app/
+                        def liveUrl = urlMatcher ? urlMatcher[0] : "https://railway.app/dashboard"
+
+                        echo "LIVE_URL=${liveUrl}"
+                        echo "Deployment complete for ${params.REPO_NAME}!"
+                    }
                 }
             }
         }
-
     }
 
     post {
