@@ -156,9 +156,36 @@ app.post("/api/deploy", async (req, res) => {
     "base64",
   );
 
+  // ✅ STEP 1: Save to MongoDB FIRST so we have the _id to pass to Jenkins
+  let deployment;
   try {
-    // Trigger Jenkins with repo URL as a parameter
-    const triggerUrl = `${jenkinsUrl}/job/smartdeploy-pipeline/buildWithParameters?REPO_URL=${encodeURIComponent(fullRepoUrl)}&REPO_NAME=${encodeURIComponent(repoName)}`;
+    deployment = new Deployment({
+      repoName: repoName,
+      repoUrl: fullRepoUrl,
+      status: "running",
+      triggeredBy: req.user.username,
+    });
+    await deployment.save();
+    console.log(`✅ MongoDB deployment saved: ${deployment._id}`);
+  } catch (dbErr) {
+    console.error("❌ MongoDB save failed:", dbErr.message);
+    return res.status(500).json({ error: "Failed to save deployment record" });
+  }
+
+  // ✅ STEP 2: Get the ngrok/backend URL so Jenkins can call back
+  const backendUrl =
+    process.env.NGROK_URL ||
+    process.env.JENKINS_URL?.replace(":8080", ":3000") ||
+    "http://localhost:3000";
+
+  try {
+    // ✅ STEP 3: Trigger Jenkins — now passes DEPLOYMENT_ID and BACKEND_URL too
+    const triggerUrl =
+      `${jenkinsUrl}/job/smartdeploy-pipeline/buildWithParameters` +
+      `?REPO_URL=${encodeURIComponent(fullRepoUrl)}` +
+      `&REPO_NAME=${encodeURIComponent(repoName)}` +
+      `&DEPLOYMENT_ID=${encodeURIComponent(deployment._id.toString())}` +
+      `&BACKEND_URL=${encodeURIComponent(backendUrl)}`;
 
     const response = await fetch(triggerUrl, {
       method: "POST",
@@ -168,16 +195,9 @@ app.post("/api/deploy", async (req, res) => {
     });
 
     if ([200, 201, 302].includes(response.status)) {
-      // Save deployment to MongoDB
-      const deployment = new Deployment({
-        repoName: repoName,
-        repoUrl: fullRepoUrl,
-        status: "running",
-        triggeredBy: req.user.username,
-      });
-      await deployment.save();
-
-      console.log(`✅ Jenkins triggered + saved to MongoDB for ${repoName}`);
+      console.log(
+        `✅ Jenkins triggered for ${repoName} (deploymentId: ${deployment._id})`,
+      );
 
       // Send start email
       try {
@@ -198,13 +218,73 @@ app.post("/api/deploy", async (req, res) => {
       });
     } else {
       console.error(`❌ Jenkins returned status: ${response.status}`);
+      // Mark the deployment as failed since Jenkins didn't accept it
+      await Deployment.findByIdAndUpdate(deployment._id, {
+        status: "failed",
+        completedAt: new Date(),
+      });
       res.status(500).json({
         error: `Failed to trigger Jenkins (status ${response.status})`,
       });
     }
   } catch (err) {
     console.error("❌ Jenkins error:", err.message);
+    // Mark the deployment as failed
+    await Deployment.findByIdAndUpdate(deployment._id, {
+      status: "failed",
+      completedAt: new Date(),
+    });
     res.status(500).json({ error: "Could not connect to Jenkins" });
+  }
+});
+
+// ==================== JENKINS CALLBACK — UPDATE DEPLOYMENT WITH LIVE URL ====================
+// ✅ This is the new route — Jenkins calls this when deploy is done
+app.post("/api/deployments/:id/update", async (req, res) => {
+  try {
+    const { status, liveUrl } = req.body;
+
+    console.log(`🔔 Jenkins callback received for deployment ${req.params.id}`);
+    console.log(`   status: ${status}, liveUrl: ${liveUrl}`);
+
+    const update = { status };
+    if (liveUrl) update.liveUrl = liveUrl;
+    if (status === "success" || status === "failed") {
+      update.completedAt = new Date();
+    }
+
+    const deployment = await Deployment.findByIdAndUpdate(
+      req.params.id,
+      update,
+      { new: true },
+    );
+
+    if (!deployment) {
+      console.error(`❌ Deployment not found: ${req.params.id}`);
+      return res.status(404).json({ error: "Deployment not found" });
+    }
+
+    console.log(
+      `✅ Deployment updated in MongoDB — status: ${status}, liveUrl: ${liveUrl}`,
+    );
+
+    // Send completion email
+    try {
+      const emailStatus = status === "success" ? "success" : "failed";
+      const logs =
+        status === "success"
+          ? `✅ Build completed successfully!\n🔗 Live URL: ${liveUrl || "Check Railway dashboard"}`
+          : `❌ Build failed. Please check Jenkins for details.`;
+      await sendDeploymentEmail(deployment.repoName, emailStatus, logs);
+      console.log(`📧 Completion email sent — ${emailStatus}`);
+    } catch (emailErr) {
+      console.error("📧 Email error (non-fatal):", emailErr.message);
+    }
+
+    res.json({ success: true, deployment });
+  } catch (err) {
+    console.error("❌ Update deployment error:", err.message);
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -243,44 +323,6 @@ app.get("/api/deploy/status", async (req, res) => {
       }
     } catch (logErr) {
       console.error("Could not fetch Jenkins log:", logErr.message);
-    }
-
-    // Update MongoDB deployment record when build finishes
-    if (data.result) {
-      const updateData = {
-        status: data.result === "SUCCESS" ? "success" : "failed",
-        jenkinsBuildNumber: data.number,
-        completedAt: new Date(),
-      };
-
-      // Save live URL if found
-      if (liveUrl) updateData.liveUrl = liveUrl;
-
-      const updatedDeployment = await Deployment.findOneAndUpdate(
-        { status: "running" },
-        updateData,
-        { sort: { triggeredAt: -1 }, new: true },
-      );
-
-      // Send completion email
-      if (updatedDeployment) {
-        const emailStatus = data.result === "SUCCESS" ? "success" : "failed";
-        const logs =
-          data.result === "SUCCESS"
-            ? `✅ Build #${data.number} completed successfully!\n🔗 Live URL: ${liveUrl || "Check Railway dashboard"}`
-            : `❌ Build #${data.number} failed. Please check Jenkins for details.`;
-
-        try {
-          await sendDeploymentEmail(
-            updatedDeployment.repoName,
-            emailStatus,
-            logs,
-          );
-          console.log(`📧 Completion email sent — ${emailStatus}`);
-        } catch (emailErr) {
-          console.error("📧 Email error (non-fatal):", emailErr.message);
-        }
-      }
     }
 
     res.json({

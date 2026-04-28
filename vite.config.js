@@ -8,7 +8,7 @@ export default defineConfig({
     outDir: "dist",
   },
   server: {
-    port: 3001,
+    port: 3002,          // ✅ changed from 3001 → 3002
     proxy: {
       "/auth": "http://localhost:3000",
       "/api": "http://localhost:3000",
