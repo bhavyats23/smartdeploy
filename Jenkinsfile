@@ -9,8 +9,8 @@ pipeline {
     }
 
     environment {
-        RAILWAY_TOKEN = '4fccaedf-f7f1-4a3a-b9e7-f3838cf2e1d5'
-        RAILWAY_CMD   = 'C:\\Users\\PALLAVI\\AppData\\Roaming\\npm\\railway.cmd'
+        RENDER_DEPLOY_HOOK = 'https://api.render.com/deploy/srv-d7oec7iqqhas73fl9aog?key=lpYlf7lvGJc'
+        LIVE_URL = 'https://smartdeploy-backend-idhp.onrender.com'
     }
 
     stages {
@@ -56,43 +56,21 @@ pipeline {
 
         stage('Deploy') {
             steps {
-                echo "Deploying ${params.REPO_NAME} to Railway..."
+                echo "Triggering Render deploy for ${params.REPO_NAME}..."
                 script {
-                    dir('repo') {
-                        def projectName = "${params.REPO_NAME}-${BUILD_NUMBER}".toLowerCase().replaceAll('[^a-z0-9-]', '-')
+                    bat """
+                        curl -s -X POST "${RENDER_DEPLOY_HOOK}"
+                    """
+                    echo "Render deploy triggered!"
+                    echo "LIVE_URL=${LIVE_URL}"
 
-                        def output = bat(
-                            script: """
-                                set RAILWAY_TOKEN=${RAILWAY_TOKEN}
-                                echo Creating Railway project: ${projectName}
-                                "${RAILWAY_CMD}" init --name ${projectName}
-                                echo --- Deploying ---
-                                "${RAILWAY_CMD}" up --detach
-                                echo --- Getting domain ---
-                                "${RAILWAY_CMD}" domain
-                            """,
-                            returnStdout: true
-                        ).trim()
-
-                        echo "=== Railway Output ==="
-                        echo "${output}"
-                        echo "======================"
-
-                        def urlMatcher = output =~ /https:\/\/[a-zA-Z0-9\-]+\.up\.railway\.app/
-                        def liveUrl = urlMatcher ? urlMatcher[0] : "https://${projectName}.up.railway.app"
-
-                        echo "LIVE_URL=${liveUrl}"
-
-                        if (params.DEPLOYMENT_ID) {
-                            bat """
-                                curl -s -X POST "${params.BACKEND_URL}/api/deployments/${params.DEPLOYMENT_ID}/update" ^
-                                -H "Content-Type: application/json" ^
-                                -d "{\\"status\\":\\"success\\",\\"liveUrl\\":\\"${liveUrl}\\"}"
-                            """
-                            echo "MongoDB updated with live URL!"
-                        }
-
-                        echo "Deployment complete for ${params.REPO_NAME}!"
+                    if (params.DEPLOYMENT_ID) {
+                        bat """
+                            curl -s -X POST "${params.BACKEND_URL}/api/deployments/${params.DEPLOYMENT_ID}/update" ^
+                            -H "Content-Type: application/json" ^
+                            -d "{\\"status\\":\\"success\\",\\"liveUrl\\":\\"${LIVE_URL}\\"}"
+                        """
+                        echo "MongoDB updated!"
                     }
                 }
             }
