@@ -357,8 +357,9 @@ app.get("/api/stats", async (req, res) => {
 // ==================== SERVE REACT FRONTEND ====================
 // ⚠️ Must be AFTER all API routes
 // app.js is inside src/server/, so dist is 2 levels up at root
+// FIXED
 app.use(express.static(path.join(__dirname, "../../dist")));
-app.get("*", (req, res) => {
+app.get("/{*path}", (req, res) => {
   res.sendFile(path.join(__dirname, "../../dist", "index.html"));
 });
 
