@@ -6,9 +6,12 @@ export default defineConfig({
   root: ".",
   build: {
     outDir: "dist",
+    commonjsOptions: {
+      transformMixedEsModules: true,
+    },
   },
   server: {
-    port: 3002,          // ✅ changed from 3001 → 3002
+    port: 3002,
     proxy: {
       "/auth": "http://localhost:3000",
       "/api": "http://localhost:3000",
