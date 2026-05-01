@@ -1,12 +1,13 @@
 ﻿require("dotenv").config();
 const mongoose = require("mongoose");
-const Deployment = require("./models/Deployment");
-const { sendDeploymentEmail } = require("./emailService");
+const Deployment = require("./src/server/models/Deployment");
+const { sendDeploymentEmail } = require("./src/server/emailService");
 const express = require("express");
 const cors = require("cors");
 const session = require("express-session");
 const passport = require("passport");
 const GitHubStrategy = require("passport-github2").Strategy;
+const path = require("path");
 
 const app = express();
 
@@ -356,6 +357,13 @@ app.get("/api/stats", async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: "Failed to fetch stats" });
   }
+});
+
+// ==================== SERVE REACT FRONTEND ====================
+// ⚠️ This must be AFTER all API routes
+app.use(express.static(path.join(__dirname, "dist")));
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "dist", "index.html"));
 });
 
 // ==================== CONNECT DB & START SERVER ====================
