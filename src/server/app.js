@@ -1,7 +1,7 @@
 ﻿require("dotenv").config();
 const mongoose = require("mongoose");
-const Deployment = require("./src/server/models/Deployment");
-const { sendDeploymentEmail } = require("./src/server/emailService");
+const Deployment = require("./models/Deployment");
+const { sendDeploymentEmail } = require("./emailService");
 const express = require("express");
 const cors = require("cors");
 const session = require("express-session");
@@ -156,7 +156,6 @@ app.post("/api/deploy", async (req, res) => {
     "base64",
   );
 
-  // ✅ STEP 1: Save to MongoDB FIRST
   let deployment;
   try {
     deployment = new Deployment({
@@ -172,14 +171,12 @@ app.post("/api/deploy", async (req, res) => {
     return res.status(500).json({ error: "Failed to save deployment record" });
   }
 
-  // ✅ STEP 2: Get backend URL for Jenkins callback
   const backendUrl =
     process.env.RENDER_EXTERNAL_URL ||
     process.env.NGROK_URL ||
     "http://localhost:3000";
 
   try {
-    // ✅ STEP 3: Trigger Jenkins
     const triggerUrl =
       `${jenkinsUrl}/job/smartdeploy-pipeline/buildWithParameters` +
       `?REPO_URL=${encodeURIComponent(fullRepoUrl)}` +
@@ -195,9 +192,7 @@ app.post("/api/deploy", async (req, res) => {
     });
 
     if ([200, 201, 302].includes(response.status)) {
-      console.log(
-        `✅ Jenkins triggered for ${repoName} (deploymentId: ${deployment._id})`,
-      );
+      console.log(`✅ Jenkins triggered for ${repoName}`);
 
       try {
         await sendDeploymentEmail(
@@ -360,10 +355,11 @@ app.get("/api/stats", async (req, res) => {
 });
 
 // ==================== SERVE REACT FRONTEND ====================
-// ⚠️ This must be AFTER all API routes
-app.use(express.static(path.join(__dirname, "dist")));
+// ⚠️ Must be AFTER all API routes
+// app.js is inside src/server/, so dist is 2 levels up at root
+app.use(express.static(path.join(__dirname, "../../dist")));
 app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "dist", "index.html"));
+  res.sendFile(path.join(__dirname, "../../dist", "index.html"));
 });
 
 // ==================== CONNECT DB & START SERVER ====================
