@@ -143,7 +143,8 @@ app.post("/api/deploy", async (req, res) => {
   if (!req.isAuthenticated())
     return res.status(401).json({ error: "Not logged in" });
 
-  const { repoName, repoUrl } = req.body;
+  // ✅ CHANGED: destructure renderHookUrl and renderServiceId from body
+  const { repoName, repoUrl, renderHookUrl, renderServiceId } = req.body;
   const fullRepoUrl =
     repoUrl || `https://github.com/${req.user.username}/${repoName}`;
 
@@ -158,9 +159,12 @@ app.post("/api/deploy", async (req, res) => {
 
   let deployment;
   try {
+    // ✅ CHANGED: save renderHookUrl and renderServiceId to MongoDB
     deployment = new Deployment({
-      repoName: repoName,
+      repoName,
       repoUrl: fullRepoUrl,
+      renderHookUrl: renderHookUrl || "",
+      renderServiceId: renderServiceId || "",
       status: "running",
       triggeredBy: req.user.username,
     });
@@ -177,12 +181,15 @@ app.post("/api/deploy", async (req, res) => {
     "http://localhost:3000";
 
   try {
+    // ✅ CHANGED: added RENDER_HOOK_URL and RENDER_SERVICE_ID to Jenkins trigger URL
     const triggerUrl =
       `${jenkinsUrl}/job/smartdeploy-pipeline/buildWithParameters` +
       `?REPO_URL=${encodeURIComponent(fullRepoUrl)}` +
       `&REPO_NAME=${encodeURIComponent(repoName)}` +
       `&DEPLOYMENT_ID=${encodeURIComponent(deployment._id.toString())}` +
-      `&BACKEND_URL=${encodeURIComponent(backendUrl)}`;
+      `&BACKEND_URL=${encodeURIComponent(backendUrl)}` +
+      `&RENDER_HOOK_URL=${encodeURIComponent(renderHookUrl || "")}` +
+      `&RENDER_SERVICE_ID=${encodeURIComponent(renderServiceId || "")}`;
 
     const response = await fetch(triggerUrl, {
       method: "POST",
@@ -355,9 +362,6 @@ app.get("/api/stats", async (req, res) => {
 });
 
 // ==================== SERVE REACT FRONTEND ====================
-// ⚠️ Must be AFTER all API routes
-// app.js is inside src/server/, so dist is 2 levels up at root
-// FIXED
 app.use(express.static(path.join(__dirname, "../../dist")));
 app.get("/{*path}", (req, res) => {
   res.sendFile(path.join(__dirname, "../../dist", "index.html"));
