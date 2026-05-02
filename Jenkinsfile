@@ -54,7 +54,7 @@ pipeline {
                             -Dsonar.projectKey=bhavyats23_smartdeploy ^
                             -Dsonar.organization=bhavyats23 ^
                             -Dsonar.projectName=SmartDeploy ^
-                            -Dsonar.sources=src ^
+                            -Dsonar.sources=. ^
                             -Dsonar.exclusions=**/node_modules/**,**/dist/**,**/*.test.js ^
                             -Dsonar.host.url=https://sonarcloud.io ^
                             -Dsonar.token=%SONAR_TOKEN%
